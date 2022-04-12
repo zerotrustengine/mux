@@ -218,6 +218,35 @@ func (r *Route) addRegexpMatcher(tpl string, typ regexpType) error {
 	return nil
 }
 
+func (r *Route) addHostRegexpMatcher(tpl string, wildcardHostPort bool) error {
+	if r.err != nil {
+		return r.err
+	}
+	rr, err := newRouteHostRegexp(tpl, wildcardHostPort, routeRegexpOptions{
+		strictSlash:    r.strictSlash,
+		useEncodedPath: r.useEncodedPath,
+	})
+	if err != nil {
+		return err
+	}
+	for _, q := range r.regexp.queries {
+		if err = uniqueVars(rr.varsN, q.varsN); err != nil {
+			return err
+		}
+	}
+	//if typ == regexpTypeHost {
+	if r.regexp.path != nil {
+		if err = uniqueVars(rr.varsN, r.regexp.path.varsN); err != nil {
+			return err
+		}
+	}
+	r.regexp.host = rr
+	//} else {
+	//}
+	r.addMatcher(rr)
+	return nil
+}
+
 // Headers --------------------------------------------------------------------
 
 // headerMatcher matches the request against header values.
@@ -290,8 +319,12 @@ func (r *Route) HeadersRegexp(pairs ...string) *Route {
 //
 // Variable names must be unique in a given route. They can be retrieved
 // calling mux.Vars(request).
-func (r *Route) Host(tpl string) *Route {
-	r.err = r.addRegexpMatcher(tpl, regexpTypeHost)
+func (r *Route) Host(tpl string, options ...bool) *Route {
+	wildcardHostPort := false
+	if len(options) > 0 {
+		wildcardHostPort = options[0]
+	}
+	r.err = r.addHostRegexpMatcher(tpl, wildcardHostPort)
 	return r
 }
 
